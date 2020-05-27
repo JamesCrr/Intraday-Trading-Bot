@@ -8,6 +8,8 @@ import json
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.techindicators import TechIndicators
 
+dateStrFormat = "%Y-%m-%d %H:%M:%S"
+
 class AVDataIndex(enum.Enum):
     Open = "1. open"
     High = "2. high"
@@ -19,21 +21,22 @@ class AVData:
         self.ts = TimeSeries(key='4ZXG1S4Z055LPBAW')
         self.ti = TechIndicators(key='4ZXG1S4Z055LPBAW')
         self.apiData = dict()
-        self.latestData_Hour = 0
+        self.latestData_Time = None
         self.latestData_Price = dir({})
         self.rsiData = dict()
 
     def FetchAPIData(self, selectedCompanySymbol, fullSize):
+        print("Fetching Data from API..")
         # Want full Market data or just latest
         # Get json object with the intraday data and another with the call's metadata
         if fullSize:
             fullApiData, meta_data = self.ts.get_intraday(symbol=selectedCompanySymbol, interval="1min", outputsize="full")
             # # Trim off other days
-            # prevDay = datetime.strptime(next(iter(fullApiData.keys())), "%Y-%m-%d %H:%M:%S")
+            # prevDay = datetime.strptime(next(iter(fullApiData.keys())), dateStrFormat)
             # prevDay = prevDay.replace(hour=0,minute=0,second=0)
             # currDay = None
             # for key, value in fullApiData.items():
-            #    currDay = datetime.strptime(key, "%Y-%m-%d %H:%M:%S")
+            #    currDay = datetime.strptime(key, dateStrFormat)
             #    currDay = currDay.replace(hour=0,minute=0,second=1)
             #    if currDay < prevDay:
             #         break
@@ -42,17 +45,16 @@ class AVData:
         else:
             self.apiData, meta_data = self.ts.get_intraday(symbol=selectedCompanySymbol, interval="1min", outputsize="compact")
         
-
-        # Getting first key and value in dictionary 
+        # Get latest time from data
         newTime = list(self.apiData.keys())[0] 
-        newTime = newTime.split()
-        self.latestData_Hour = int((newTime[1])[:2])
+        self.latestData_Time = datetime.strptime(newTime, dateStrFormat)
         self.latestData_Price = list(self.apiData.values())[0]
         print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
         # print("Current Prices: ", self.latestData_Price)
         # print (self.latestData_Price[AVDataIndex.Open.value])
 
     def FetchRSI(self, selectedCompanySymbol, rsiDate, period = 14):
+        # Check if key already exists
         if rsiDate in self.rsiData:
             return self.rsiData[rsiDate]
         # Declare vars
@@ -60,7 +62,7 @@ class AVData:
         firstTotalLoss = 0.0
         firstSampleRange = period * 5
         secondSampleRange = period
-        previousPrices = self.GetDaysPrice_Previous(rsiDate, firstSampleRange + secondSampleRange)
+        previousPrices = self.GetPrice_Previous(rsiDate, firstSampleRange + secondSampleRange)
         averageGain = 0.0
         averageLoss = 0.0
         currDayGain = 0.0
@@ -99,7 +101,7 @@ class AVData:
             self.rsiData[keyList[index]] = 100 - (100 / (1 + rs))
         
         # # Get Total Gain and Loss
-        # previousPrices = self.GetDaysPrice_Previous(rsiDate, period)
+        # previousPrices = self.GetPrice_Previous(rsiDate, period)
         # keyList=sorted(previousPrices.keys())
         # for index, keyValue in enumerate(keyList):
         #     if index == 0:
@@ -124,21 +126,57 @@ class AVData:
         # Return final Date's RSI
         return self.rsiData[rsiDate]
 
-    def GetRSI(self, selectedCompanySymbol):
-        data, meta_data = self.ti.get_rsi(symbol=selectedCompanySymbol, interval='1min', time_period=14)
-        return data
+    def FetchEMA(self, selectedCompanySymbol, emaDate, period = 10):
+        # Declare vars
+        ema = 0.0
+        smaPeriod = 10  # Applies an 18.18% weighting to the most recent price
+        multipler = 2 / (period + 1)
+        previousPrices = self.GetPrice_Previous(emaDate, period + smaPeriod)
+        keyList=sorted(previousPrices.keys())
+        # Find Initial EMA first by using SMA
+        recordedPriceCounter = 0
+        for index, keyValue in enumerate(keyList):
+            if index == smaPeriod:
+                break
+            if previousPrices[keyValue] is None:
+                continue
+            ema += float(previousPrices[keyValue][AVDataIndex.Close.value])
+            recordedPriceCounter += 1
+        ema = ema / recordedPriceCounter
+        # Calculate target day EMA using Initial EMA
+        for index in range(smaPeriod, len(previousPrices)):
+           ema = ((float(previousPrices[keyList[index]][AVDataIndex.Close.value]) - ema) * multipler) + ema
+        # Return EMA
+        return ema 
 
-    def GetMACD(self, selectedCompanySymbol):
-        data, meta_data = self.ti.get_macd(symbol=selectedCompanySymbol, interval='1min')
-        return data
+    def FetchMACDLine(self, selectedCompanySymbol, macdDate, shortTermEMAPeriod = 12, longTermEMAPeriod = 26):
+        macdLine = self.FetchEMA(selectedCompanySymbol, macdDate, shortTermEMAPeriod) - self.FetchEMA(selectedCompanySymbol, macdDate, longTermEMAPeriod)
+        return macdLine
 
-    def GetDaysPrice_NextPrevious(self, centerDate, scopeRange = 0):
+    def GetDayPrices(self, selectedCompanySymbol, dayStr):
+        currDay = datetime.strptime(dayStr, dateStrFormat)
+        currDay = currDay.replace(hour=16,minute=0,second=0)
+        currDayStr = currDay.strftime(dateStrFormat)
+        if currDay in self.apiData:
+            return None
+
+        datePrices = dict()
+        datePrices[currDayStr] = self.apiData.get(currDayStr)
+        while currDay.hour != 9 or currDay.minute != 30:
+            currDay = currDay - timedelta(minutes=1)
+            currDayStr = currDay.strftime(dateStrFormat)
+            if self.apiData.get(currDayStr) is None:
+                continue
+            datePrices[currDayStr] = self.apiData.get(currDayStr)
+        # return Prices only in that Day 
+        return datePrices
+    def GetPrice_NextPrevious(self, centerDate, scopeRange = 0):
         if self.apiData.get(centerDate) == None:
             return None
         selectedDates = dict()
         selectedDates[centerDate] = self.apiData.get(centerDate)
         if scopeRange > 0:
-            currDate = datetime.strptime(centerDate, "%Y-%m-%d %H:%M:%S")
+            currDate = datetime.strptime(centerDate, dateStrFormat)
             newDate = currDate
             newDateStr = ""
             # Forward Days
@@ -148,7 +186,7 @@ class AVData:
                     newDate = newDate.replace(hour=9, minute=31, second=0)
                 else:
                     newDate = newDate + timedelta(minutes=1)
-                newDateStr = newDate.strftime("%Y-%m-%d %H:%M:%S")
+                newDateStr = newDate.strftime(dateStrFormat)
                 if self.apiData.get(newDateStr) == None:
                     break
                 else:
@@ -161,19 +199,19 @@ class AVData:
                     newDate = newDate.replace(hour=16, minute=0, second=0)
                 else:
                     newDate = newDate - timedelta(minutes=1)
-                newDateStr = newDate.strftime("%Y-%m-%d %H:%M:%S")
+                newDateStr = newDate.strftime(dateStrFormat)
                 if self.apiData.get(newDateStr) == None:
                     break
                 else:
                     selectedDates[newDateStr] = self.apiData.get(newDateStr)
         return selectedDates
-    def GetDaysPrice_Previous(self, firstDate, previousRange = 0):
+    def GetPrice_Previous(self, firstDate, previousRange = 0):
         if self.apiData.get(firstDate) is None:
             return None
         selectedDates = dict()
         selectedDates[firstDate] = self.apiData.get(firstDate)
         if previousRange > 0:
-            currDate = datetime.strptime(firstDate, "%Y-%m-%d %H:%M:%S")
+            currDate = datetime.strptime(firstDate, dateStrFormat)
             newDate = currDate
             newDateStr = ""
             # Previous Days
@@ -184,7 +222,7 @@ class AVData:
                 else:
                     newDate = newDate - timedelta(minutes=1)
                 # Check date exists in API
-                newDateStr = newDate.strftime("%Y-%m-%d %H:%M:%S")
+                newDateStr = newDate.strftime(dateStrFormat)
                 if self.apiData.get(newDateStr) is None:
                     # If date missing, fill in None
                     selectedDates[newDateStr] = None
@@ -233,28 +271,33 @@ class VirtualTrading:
     def StartTrading_SimulatePastDay(self):
         self.AVData.FetchAPIData("WIX",True)
 
-        # for key, value in sorted(self.AVData.apiData.items()):
-        #     print(key + " / " + value[AVDataIndex.Close.value])
+        todayPrices = self.AVData.GetDayPrices("WIX", self.AVData.latestData_Time.strftime(dateStrFormat))
+        for key, value in sorted(todayPrices.items()):
+            print(key + " / " + value[AVDataIndex.Close.value])
 
-        # selectedDates = self.AVData.GetDaysPrice_Previous("2020-05-22 09:31:00", 3)
+        # selectedDates = self.AVData.GetPrice_Previous("2020-05-22 09:31:00", 3)
         # for key, value in sorted(selectedDates.items()):
             # ownRSI = self.AVData.FetchRSI("WIX", key)
             # print(key + " / " + value[AVDataIndex.Close.value] + " / RSI: " + str(ownRSI))
 
-        strTime = '2020-05-22 16:00:00'
-        ownRSI = self.AVData.FetchRSI("WIX", strTime)
-        print(strTime + ": " + str(ownRSI))
-        strTime = '2020-05-22 15:24:00'
-        ownRSI = self.AVData.FetchRSI("WIX", strTime)
-        print(strTime + ": " + str(ownRSI))
-        strTime = '2020-05-22 10:26:00'
-        ownRSI = self.AVData.FetchRSI("WIX", strTime)
-        print(strTime + ": " + str(ownRSI))
+        # strTime = '2020-05-22 16:00:00'
+        # ownRSI = self.AVData.FetchRSI("WIX", strTime)
+        # print(strTime + ": " + str(ownRSI))
+        # strTime = '2020-05-22 15:24:00'
+        # ownRSI = self.AVData.FetchRSI("WIX", strTime)
+        # print(strTime + ": " + str(ownRSI))
+        # strTime = '2020-05-22 10:26:00'
+        # ownRSI = self.AVData.FetchRSI("WIX", strTime)
+        # print(strTime + ": " + str(ownRSI))
+
+        # strTime = '2020-05-22 15:00:00'
+        # MACDLine = self.AVData.FetchMACDLine("WIX", strTime)
+        # print(strTime + " MACDLine: " + str(MACDLine))
 
     def MarketStillOpen(self):
         tz_NY = pytz.timezone('America/New_York') 
         datetime_NY = datetime.now(tz_NY)
-        datetimeStr_NY = datetime_NY.strftime("%Y-%m-%d %H:%M:%S")
+        datetimeStr_NY = datetime_NY.strftime(dateStrFormat)
         print("NY Time: " + datetimeStr_NY)
         
         datetimeStr_NY = datetimeStr_NY.split()
