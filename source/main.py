@@ -9,6 +9,11 @@ from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.techindicators import TechIndicators
 
 dateStrFormat = "%Y-%m-%d %H:%M:%S"
+accFundStr = "funds"
+accComStr = "coms"
+accComFundPercentStr = "fundPercent"
+accComSharesLeftStr = "sharesLeft"
+
 
 class AVDataIndex(enum.Enum):
     Open = "1. open"
@@ -49,6 +54,7 @@ class AVData:
         newTime = list(self.apiData.keys())[0] 
         self.latestData_Time = datetime.strptime(newTime, dateStrFormat)
         self.latestData_Price = list(self.apiData.values())[0]
+        newTime = newTime.split()
         print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
         # print("Current Prices: ", self.latestData_Price)
         # print (self.latestData_Price[AVDataIndex.Open.value])
@@ -62,6 +68,7 @@ class AVData:
         firstTotalLoss = 0.0
         firstSampleRange = period * 5
         secondSampleRange = period
+        lastRecordedDate = ""
         previousPrices = self.GetPrice_Previous(rsiDate, firstSampleRange + secondSampleRange)
         averageGain = 0.0
         averageLoss = 0.0
@@ -99,6 +106,7 @@ class AVData:
             # Calculate RSI and set for values in period
             rs = averageGain / averageLoss
             self.rsiData[keyList[index]] = 100 - (100 / (1 + rs))
+            lastRecordedDate = keyList[index]
         
         # # Get Total Gain and Loss
         # previousPrices = self.GetPrice_Previous(rsiDate, period)
@@ -123,8 +131,11 @@ class AVData:
         # rs = ((averageGain * (period-1) + currDayGain)/period) / ((averageLoss * (period-1) + currDayLoss)/period)
         # self.rsiData[rsiDate] = 100 - (100 / (1 + rs))
 
-        # Return final Date's RSI
-        return self.rsiData[rsiDate]
+        # Check if date valid
+        if rsiDate in self.rsiData:
+            return self.rsiData[rsiDate]
+        else:
+           return self.rsiData[lastRecordedDate]
 
     def FetchEMA(self, selectedCompanySymbol, emaDate, period = 10):
         # Declare vars
@@ -145,7 +156,9 @@ class AVData:
         ema = ema / recordedPriceCounter
         # Calculate target day EMA using Initial EMA
         for index in range(smaPeriod, len(previousPrices)):
-           ema = ((float(previousPrices[keyList[index]][AVDataIndex.Close.value]) - ema) * multipler) + ema
+            if previousPrices[keyList[index]] is None:
+                continue
+            ema = ((float(previousPrices[keyList[index]][AVDataIndex.Close.value]) - ema) * multipler) + ema
         # Return EMA
         return ema 
 
@@ -234,6 +247,7 @@ class AVData:
 class VirtualTrading:
     def __init__(self):
         self.account = dict()
+        self.companiesFromAccount = []
         self.dataDirPath = os.path.join(os.getcwd(), "data")
         self.dataFilePath = os.path.join(os.getcwd(), "data", "accountInfo.json")
         self.AVData = AVData()
@@ -241,9 +255,6 @@ class VirtualTrading:
     def StartProgram(self):
 
         if not self.LoadFromFile():
-            print("Creating new account")
-            self.account = dict()
-            self.account["funds"] = 10000
             self.CreateNewAccount()
 
         if self.MarketStillOpen():
@@ -269,12 +280,42 @@ class VirtualTrading:
         print("Market has Closed.")
 
     def StartTrading_SimulatePastDay(self):
-        self.AVData.FetchAPIData("WIX",True)
+        selectedCompanyKey = self.companiesFromAccount[0]
+        selectedPercent = self.account[accComStr][selectedCompanyKey][accComFundPercentStr] / 100.0
+        startingBalance = self.account[accFundStr]
 
-        todayPrices = self.AVData.GetDayPrices("WIX", self.AVData.latestData_Time.strftime(dateStrFormat))
+        self.AVData.FetchAPIData(selectedCompanyKey,True)
+        print("Starting Balance: $" + str(startingBalance))
+        todayPrices = self.AVData.GetDayPrices(selectedCompanyKey, self.AVData.latestData_Time.strftime(dateStrFormat))
+        currFunds = self.account[accFundStr] * selectedPercent
+        bought = False
+        entryPrice = 0.0
+        transactionCounter = 0
         for key, value in sorted(todayPrices.items()):
-            print(key + " / " + value[AVDataIndex.Close.value])
-
+            if bought:
+                # Decide when to sell
+                if self.AVData.FetchRSI(selectedCompanyKey, key) < 70:
+                    continue
+                if self.AVData.FetchMACDLine(selectedCompanyKey, key) > 0:
+                    continue
+                bought = False
+                transactionCounter += 1
+                currFunds = currFunds * (float(value[AVDataIndex.Close.value])/entryPrice)
+            else:
+                # Decide when to buy
+                if self.AVData.FetchRSI(selectedCompanyKey, key) > 30:
+                    continue
+                # if self.AVData.FetchMACDLine(selectedCompanyKey, key) < 0:
+                #     continue
+                bought = True
+                entryPrice = float(value[AVDataIndex.Close.value])
+                transactionCounter += 1
+        
+        self.account[accFundStr] = currFunds
+        print("Final Balance: $" + str(self.account[accFundStr]))
+        print("Transaction Count: " + str(transactionCounter))
+        print("Net Gain: " + str(startingBalance/self.account[accFundStr]) + "%")
+        self.SaveToFile()
         # selectedDates = self.AVData.GetPrice_Previous("2020-05-22 09:31:00", 3)
         # for key, value in sorted(selectedDates.items()):
             # ownRSI = self.AVData.FetchRSI("WIX", key)
@@ -311,8 +352,10 @@ class VirtualTrading:
             print("Unable to find accountInfo.json file under: " + self.dataDirPath)
             print("Aborting Save")
             return False
+        # print("Saving Account Info..")
         with open(self.dataFilePath, 'w+') as outFile:
             json.dump(self.account, outFile)
+        # print("Account Saved")
         return True
     def LoadFromFile(self):
         if os.path.exists(self.dataDirPath) == False:
@@ -321,13 +364,23 @@ class VirtualTrading:
             return False
         with open(self.dataFilePath) as jsonFile:
             self.account = json.load(jsonFile)
+        for key, value in self.account[accComStr].items():
+            self.companiesFromAccount.append(key)
         return True
     def CreateNewAccount(self):
+        print("Creating new account")
+        self.account = dict()
+        self.account[accFundStr] = 10000
+        self.account[accComStr] = dict()
+        self.account[accComStr]["WIX"] = dict()
+        self.account[accComStr]["WIX"][accComFundPercentStr] = 100
+        self.account[accComStr]["WIX"][accComSharesLeftStr] = 0
+
         if os.path.exists(self.dataDirPath) == False:
             os.mkdir(self.dataDirPath)
         with open(self.dataFilePath, 'w+') as outFile:
             json.dump(self.account, outFile)
-        print("New Account made with inital fund of: $" + str(self.account["funds"]))
+        print("New Account made with inital fund of: $" + str(self.account[accFundStr]))
 
 if __name__ == "__main__":
     vt = VirtualTrading()
