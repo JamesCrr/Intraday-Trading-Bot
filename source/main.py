@@ -283,12 +283,14 @@ class VirtualTrading:
         selectedCompanyKey = self.companiesFromAccount[0]
         selectedPercent = self.account[accComStr][selectedCompanyKey][accComFundPercentStr] / 100.0
         startingBalance = self.account[accFundStr]
+        bought = False
+        if self.account[accComStr][selectedCompanyKey][accComSharesLeftStr] > 0:
+            bought = True
 
         self.AVData.FetchAPIData(selectedCompanyKey,True)
         print("Starting Balance: $" + str(startingBalance))
         todayPrices = self.AVData.GetDayPrices(selectedCompanyKey, self.AVData.latestData_Time.strftime(dateStrFormat))
         currFunds = self.account[accFundStr] * selectedPercent
-        bought = False
         entryPrice = 0.0
         transactionCounter = 0
         for key, value in sorted(todayPrices.items()):
@@ -310,11 +312,12 @@ class VirtualTrading:
                 bought = True
                 entryPrice = float(value[AVDataIndex.Close.value])
                 transactionCounter += 1
-        
+        if bought:
+            self.account[accComStr][selectedCompanyKey][accComSharesLeftStr] = 1
         self.account[accFundStr] = currFunds
         print("Final Balance: $" + str(self.account[accFundStr]))
         print("Transaction Count: " + str(transactionCounter))
-        print("Net Gain: " + str(startingBalance/self.account[accFundStr]) + "%")
+        print("Net Gain: " + str(1-self.account[accFundStr]/startingBalance) + "%")
         self.SaveToFile()
         # selectedDates = self.AVData.GetPrice_Previous("2020-05-22 09:31:00", 3)
         # for key, value in sorted(selectedDates.items()):
