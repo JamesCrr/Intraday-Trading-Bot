@@ -13,6 +13,7 @@ accFundStr = "funds"
 accComStr = "coms"
 accComFundPercentStr = "fundPercent"
 accComSharesLeftStr = "sharesLeft"
+accComSharesPriceStr = "sharesPrice"
 
 
 class AVDataIndex(enum.Enum):
@@ -266,32 +267,68 @@ class VirtualTrading:
         print("Exiting Program..")
 
     def StartTrading_RealTime(self):
+        selectedCompanyKey = self.companiesFromAccount[0]
+        selectedPercent = self.account[accComStr][selectedCompanyKey][accComFundPercentStr] / 100.0
+        startingBalance = self.account[accFundStr]
+        bought = False
+        entryPrice = 0.0
+        if self.account[accComStr][selectedCompanyKey][accComSharesLeftStr] > 0:
+            bought = True
+            entryPrice = self.account[accComStr][selectedCompanyKey][accComSharesPriceStr]
 
-        # while(self.latestData_Hour < 16):
-        #     self.FetchAPIData(False)
-        #     if self.latestData_Hour >= 16:
-        #         break
-        #     # Evaluate Prices 
-            
-            
-        #     # Sleep for 90s bfr fetching new data
-        #     time.sleep(10)
-        
+        print("Starting Balance: $" + str(startingBalance))
+        currFunds = self.account[accFundStr] * selectedPercent
+        transactionCounter = 0
+
+        while(self.AVData.latestData_Time.hour < 16):
+            self.FetchAPIData(selectedCompanyKey, False)
+            if self.AVData.latestData_Time.hour == 16:
+                break
+            # Evaluate Prices 
+            for key, value in self.AVData.apiData.items():
+                if bought:
+                    # Decide when to sell
+                    if self.AVData.FetchRSI(selectedCompanyKey, key) < 70:
+                        continue
+                    if self.AVData.FetchMACDLine(selectedCompanyKey, key) > 0:
+                        continue
+                    bought = False
+                    transactionCounter += 1
+                    currFunds = currFunds * (float(value[AVDataIndex.Close.value])/entryPrice)
+                else:
+                    # Decide when to buy
+                    if self.AVData.FetchRSI(selectedCompanyKey, key) > 30:
+                        continue
+                    # if self.AVData.FetchMACDLine(selectedCompanyKey, key) < 0:
+                    #     continue
+                    bought = True
+                    entryPrice = float(value[AVDataIndex.Close.value])
+                    transactionCounter += 1
+                # Don't evaluate previous prices
+                break
+            # Sleep for 60s bfr fetching new data
+            time.sleep(60)
+        print("Final Balance: $" + str(self.account[accFundStr]))
+        print("Transaction Count: " + str(transactionCounter))
+        print("Net Gain: " + str(1-self.account[accFundStr]/startingBalance) + "%")
+        self.SaveToFile()
         print("Market has Closed.")
+        
 
     def StartTrading_SimulatePastDay(self):
         selectedCompanyKey = self.companiesFromAccount[0]
         selectedPercent = self.account[accComStr][selectedCompanyKey][accComFundPercentStr] / 100.0
         startingBalance = self.account[accFundStr]
         bought = False
+        entryPrice = 0.0
         if self.account[accComStr][selectedCompanyKey][accComSharesLeftStr] > 0:
             bought = True
+            entryPrice = self.account[accComStr][selectedCompanyKey][accComSharesPriceStr]
 
         self.AVData.FetchAPIData(selectedCompanyKey,True)
         print("Starting Balance: $" + str(startingBalance))
         todayPrices = self.AVData.GetDayPrices(selectedCompanyKey, self.AVData.latestData_Time.strftime(dateStrFormat))
         currFunds = self.account[accFundStr] * selectedPercent
-        entryPrice = 0.0
         transactionCounter = 0
         for key, value in sorted(todayPrices.items()):
             if bought:
@@ -312,8 +349,10 @@ class VirtualTrading:
                 bought = True
                 entryPrice = float(value[AVDataIndex.Close.value])
                 transactionCounter += 1
+        # Record down shares left in market
         if bought:
             self.account[accComStr][selectedCompanyKey][accComSharesLeftStr] = 1
+            self.account[accComStr][selectedCompanyKey][accComSharesPriceStr] = entryPrice
         self.account[accFundStr] = currFunds
         print("Final Balance: $" + str(self.account[accFundStr]))
         print("Transaction Count: " + str(transactionCounter))
@@ -378,6 +417,7 @@ class VirtualTrading:
         self.account[accComStr]["WIX"] = dict()
         self.account[accComStr]["WIX"][accComFundPercentStr] = 100
         self.account[accComStr]["WIX"][accComSharesLeftStr] = 0
+        self.account[accComStr]["WIX"][accComSharesPriceStr] = 0
 
         if os.path.exists(self.dataDirPath) == False:
             os.mkdir(self.dataDirPath)
