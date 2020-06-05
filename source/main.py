@@ -196,7 +196,10 @@ class AVData:
             # Forward Days
             for d in range(scopeRange):
                 if newDate.hour == 16:
-                    newDate = newDate + timedelta(days=1)
+                    if newDate.weekday() == 4:
+                        newDate = newDate + timedelta(days=3)
+                    else:
+                        newDate = newDate + timedelta(days=1)
                     newDate = newDate.replace(hour=9, minute=31, second=0)
                 else:
                     newDate = newDate + timedelta(minutes=1)
@@ -209,7 +212,10 @@ class AVData:
             newDate = currDate
             for d in range(scopeRange):
                 if newDate.hour == 9 and newDate.minute == 31:
-                    newDate = newDate - timedelta(days=1)
+                    if newDate.weekday() == 0:
+                        newDate = newDate - timedelta(days=3)
+                    else:
+                        newDate = newDate - timedelta(days=1)
                     newDate = newDate.replace(hour=16, minute=0, second=0)
                 else:
                     newDate = newDate - timedelta(minutes=1)
@@ -231,7 +237,10 @@ class AVData:
             # Previous Days
             for d in range(previousRange):
                 if newDate.hour == 9 and newDate.minute == 31:
-                    newDate = newDate - timedelta(days=1)
+                    if newDate.weekday() == 0:
+                        newDate = newDate - timedelta(days=3)
+                    else:
+                        newDate = newDate - timedelta(days=1)
                     newDate = newDate.replace(hour=16, minute=0, second=0)
                 else:
                     newDate = newDate - timedelta(minutes=1)
