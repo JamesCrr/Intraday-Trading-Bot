@@ -29,5 +29,5 @@ python [Path to python File]
 ```
 
 ## Future possible todos
-[ ] Menu to use different strategies
-[ ] Menu to select different companies
+- [ ] Menu to use different strategies
+- [ ] Menu to select different companies
