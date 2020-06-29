@@ -365,7 +365,8 @@ class VirtualTrading:
         self.account[accFundStr] = currFunds
         print("Final Balance: $" + str(self.account[accFundStr]))
         print("Transaction Count: " + str(transactionCounter))
-        print("Net Gain: " + str(1-self.account[accFundStr]/startingBalance) + "%")
+        # print("Net Gain: " + str(1-self.account[accFundStr]/startingBalance) + "%")
+        print("Net Gain: " + str(((self.account[accFundStr]-startingBalance)/startingBalance)*100) + "%")
         self.SaveToFile()
         # selectedDates = self.AVData.GetPrice_Previous("2020-05-22 09:31:00", 3)
         # for key, value in sorted(selectedDates.items()):
