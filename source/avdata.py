@@ -16,11 +16,9 @@ class AVData:
     def __init__(self):
         self.ts = TimeSeries(key='4ZXG1S4Z055LPBAW')
         self.str_DateTimeFormat = "%Y-%m-%d %H:%M:%S"
-        self.str_IntervalTime = "1min" # 1, 5, 15, 30, 60 are supported
+        self.str_IntervalTime = "1min"      # 1, 5, 15, 30, 60 are supported
         self.apiData = None
         self.dt_LatestDataTime = None
-        # Technical Indicators
-        self.rsiData = None
 
 
     def FetchEquityData(self, str_Name, b_FullSize):
@@ -38,6 +36,48 @@ class AVData:
         self.dt_LatestDataTime = datetime.strptime(newTime, self.str_DateTimeFormat)
         newTime = newTime.split()
         print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
+
+    def FetchRSI(self, str_Date, i_period = 14):
+        i_Intervaltime = self.__GetIntervalTimingInt()
+        dt_SelectedDate = datetime.strptime(str_Date, self.str_DateTimeFormat)
+        dt_SelectedDate = self.__GetNewTradingDate(dt_SelectedDate, -i_Intervaltime * i_period, True)
+        f_AverageGains = 0.0
+        f_AverageLosts = 0.0
+        f_PriceDiff = 0.0
+        i_AddedCounter = 0
+        # Calculate Initial i_period day Avg Gain/Loss
+        dict_PrevPrices = self.GetPreviousDatePrices(dt_SelectedDate, i_period-1)
+        list_PrevPricesKeys = list(dict_PrevPrices.keys())
+        for index, value in enumerate(list_PrevPricesKeys):
+            if index == 0:
+                continue
+            f_PriceDiff = dict_PrevPrices[value] - dict_PrevPrices[list_PrevPricesKeys[index-1]]
+            if f_PriceDiff > 0:
+                f_AverageGains += f_PriceDiff
+                i_AddedCounter += 1
+            elif f_PriceDiff < 0:
+                f_AverageLosts += -f_PriceDiff
+                i_AddedCounter += 1
+        f_AverageGains /= i_AddedCounter
+        f_AverageLosts /= i_AddedCounter
+        # Subsequent calculations uses prior averages
+        dt_SelectedDate = datetime.strptime(str_Date, self.str_DateTimeFormat)
+        dict_PrevPrices = self.GetPreviousDatePrices(dt_SelectedDate, i_period)
+        list_PrevPricesKeys = list(dict_PrevPrices.keys())
+        for index, value in enumerate(list_PrevPricesKeys):
+            if index == 0:
+                continue
+            f_PriceDiff = dict_PrevPrices[value] - dict_PrevPrices[list_PrevPricesKeys[index-1]]
+            if f_PriceDiff > 0:
+                f_AverageGains = (f_AverageGains*(i_period-1)+f_PriceDiff)/i_period
+                f_AverageLosts = (f_AverageLosts*(i_period-1))/i_period
+            elif f_PriceDiff < 0:
+                f_AverageLosts = (f_AverageLosts*(i_period-1)+(-f_PriceDiff))/i_period
+                f_AverageGains = (f_AverageGains*(i_period-1))/i_period
+        # Calculate Final RSI
+        f_RS = f_AverageGains / f_AverageLosts
+        f_RSI = 100 - (100/(1+f_RS))
+        return f_RSI
 
     def GetDayPrices(self, dt_Date):
         dt_CurrDate = dt_Date
@@ -76,19 +116,19 @@ class AVData:
             if self.apiData.get(str_SelectedDate) is None:
                 dt_TempDate = self.__GetPreviousValidAPIDate(dt_SelectedDate)
                 str_TempDate = dt_TempDate.strftime(self.str_DateTimeFormat)
-                datePrices[str_SelectedDate] = self.apiData.get(str_TempDate)[AVDataIndex.Close.value]
+                datePrices[str_SelectedDate] = float(self.apiData.get(str_TempDate)[AVDataIndex.Close.value])
             else:
-                datePrices[str_SelectedDate] = self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value]
+                datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
         # Current Date doesn't exist
         dt_SelectedDate = dt_Date
         str_SelectedDate = dt_SelectedDate.strftime(self.str_DateTimeFormat)
-        datePrices[str_SelectedDate] = 0
+        datePrices[str_SelectedDate] = 0.0
         if self.apiData.get(str_SelectedDate) is None:
             dt_TempDate = self.__GetPreviousValidAPIDate(dt_Date)
             str_TempDate = dt_TempDate.strftime(self.str_DateTimeFormat)
-            datePrices[str_SelectedDate] = self.apiData.get(str_TempDate)[AVDataIndex.Close.value]
+            datePrices[str_SelectedDate] = float(self.apiData.get(str_TempDate)[AVDataIndex.Close.value])
         else:
-            datePrices[str_SelectedDate] = self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value]
+            datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
         
         return datePrices
 

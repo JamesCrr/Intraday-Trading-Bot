@@ -29,6 +29,8 @@ class TradeBot:
 
         for name in self.TradeAccount.GetSelectedEquityNames():
             self.AVData.FetchEquityData(name, True)
+
+            print("RSI:" + str(self.AVData.FetchRSI("2020-07-2 16:0:00")))            
             break
         
         # dayprices = self.AVData.GetDayPrices(self.AVData.dt_LatestDataTime)
