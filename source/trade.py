@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from avdata import AVData, AVDataIndex
+from avdata import AVData, AVDataIndex, MACDIndex
 from account import TradeAccount
 import time
 import pytz
@@ -27,12 +27,58 @@ class TradeBot:
 
     def __StartTrading_SimulatePastDay(self):
 
-        for name in self.TradeAccount.GetSelectedEquityNames():
-            self.AVData.FetchEquityData(name, True)
+        f_RSI = 0.0
+        dict_MACD = None
+        f_PreviousMACD = 0.0
+        b_Bought = False
+        i_TradeCount = 0
+        i_TotalTradeCount = 0
+        f_StartBalance = self.TradeAccount.GetTotalFunds()
+        # Fetch Equity Data
+        for EquityName in self.TradeAccount.GetSelectedEquityNames():
+            self.AVData.FetchEquityData(EquityName, True)
+            # self.AVData.CalculateLatestEMA()
+            if self.TradeAccount.GetEquityEntryPrice(EquityName) != 0.0:
+                b_Bought = True
+            print("Now Trading -> " + EquityName + " \nPlease Hold...")
+            i_BeforeBalance = self.TradeAccount.GetTotalFunds()
+            i_TradeCount = 0
 
-            print("RSI:" + str(self.AVData.FetchRSI("2020-07-2 16:0:00")))            
-            break
+            # Go through all Prices in Day
+            for key, value in self.AVData.GetDayPrices(self.AVData.dt_LatestDataTime).items():
+                f_RSI = self.AVData.FetchRSI(key)
+                dict_MACD = self.AVData.FetchMACD(key)
+
+                if b_Bought == False:
+                    # Buy
+                    if f_RSI > 35:
+                        continue
+                    self.TradeAccount.SetEquityEntryPrice(EquityName, float(value))
+                    i_TradeCount += 1
+                    b_Bought = True
+                else:
+                    # Sell
+                    if f_RSI < 65:
+                        continue
+                    self.TradeAccount.SetEquityFundStake(EquityName, float(value))
+                    i_TradeCount += 1
+                    b_Bought = False
+            
+            print("**********  Trade End  **********")
+            print("Balance BEFORE trade : " + str(i_BeforeBalance))
+            print("Balance AFTER trade  : " + str(self.TradeAccount.GetTotalFunds()))
+            print("Trade Counts         : " + str(i_TradeCount))
+            print("Net Gain             : " + str(((self.TradeAccount.GetTotalFunds()-i_BeforeBalance)/i_BeforeBalance)*100.0)  + " %")
+            print("*********************************\n")
+            i_TotalTradeCount += i_TradeCount
+            # break
         
+        print("============  End of Day  =============")
+        print("Starting Balance : " + str(f_StartBalance))
+        print("Ending Balance   : " + str(self.TradeAccount.GetTotalFunds()))
+        print("Trade Counts     : " + str(i_TotalTradeCount))
+        print("Net Gain         : " + str(((self.TradeAccount.GetTotalFunds()-f_StartBalance)/f_StartBalance)*100.0)  + " %")
+        print("=======================================")
         # dayprices = self.AVData.GetDayPrices(self.AVData.dt_LatestDataTime)
         # for k, v in dayprices.items():
         #     print(k + " | " + str(v))
@@ -42,9 +88,9 @@ class TradeBot:
         # for k, v in prevprices.items():
         #     print(k + " | " + str(v))
         
-        # olddate = datetime.strptime("2020-07-6 16:0:00", self.AVData.str_DateTimeFormat)
-        # newdate = self.AVData.GetNewTradingDate(olddate, 7)
-        # print(newdate.strftime(self.AVData.str_DateTimeFormat))
+        # olddate = datetime.strptime("2020-07-2 16:0:00", self.AVData.str_DateTimeFormat)
+        # newdate = self.AVData.GetNewTradingDate(olddate, -391, True)
+        # print("OldDate: " + olddate.strftime(self.AVData.str_DateTimeFormat) + " NewDate: " + newdate.strftime(self.AVData.str_DateTimeFormat))
 
     def __MarketStillOpen(self):
         tz_NY = pytz.timezone('America/New_York') 
