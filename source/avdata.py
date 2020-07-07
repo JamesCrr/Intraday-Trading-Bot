@@ -5,6 +5,9 @@ import enum
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.techindicators import TechIndicators
 
+class AVDataTraverse(enum.Enum):
+    NewDate = "newDate"
+    Index = "index"
 class MACDIndex(enum.Enum):
     MACDLine = "diff"
     SignalLine = "signal"
@@ -44,10 +47,10 @@ class AVData:
         print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
         print("=======================================\n")
 
-    def FetchRSI(self, str_Date, i_Period = 14):
+    def FetchRSI(self, str_Date, i_DateIndex, i_Period = 14):
         i_Intervaltime = self.__GetIntervalTimingInt()
-        dt_SelectedDate = datetime.strptime(str_Date, self.str_DateTimeFormat)
-        dt_SelectedDate = self.__GetNewTradingDate(dt_SelectedDate, -i_Intervaltime * i_Period, True)
+        dict_DateResult = self.__GetNewTradingDate_Dictionary(None, -i_Intervaltime * i_Period, i_DateIndex)
+        dt_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value] 
         f_AverageGains = 0.0
         f_AverageLosts = 0.0
         f_PriceDiff = 0.0
@@ -86,11 +89,11 @@ class AVData:
         f_RSI = 100.0 - (100.0/(1.0+f_RS))
         return f_RSI
 
-    def FetchMACD(self, str_Date, i_FastPeriod = 12, i_SlowPeriod = 26, i_SignalPeriod = 9):
+    def FetchMACD(self, str_Date, i_DateIndex, i_FastPeriod = 12, i_SlowPeriod = 26, i_SignalPeriod = 9):
         dict_MACD = dict()
         i_Intervaltime = self.__GetIntervalTimingInt()
-        dt_SelectedDate = datetime.strptime(str_Date, self.str_DateTimeFormat)
-        dt_SelectedDate = self.__GetNewTradingDate(dt_SelectedDate, -i_Intervaltime * i_SignalPeriod, True)
+        dict_DateResult = self.__GetNewTradingDate_Dictionary(None, -i_Intervaltime * i_SignalPeriod, i_DateIndex)
+        dt_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
         # Signal SMA
         f_SignalEMA = 0.0
         f_Smoother = 2 / (i_SignalPeriod + 1)
@@ -110,10 +113,12 @@ class AVData:
         dict_MACD[MACDIndex.Histogram.value] = dict_MACD[MACDIndex.MACDLine.value] - f_SignalEMA
         return dict_MACD
 
+
     def FetchEMA(self, str_Date, i_Period):
         i_Intervaltime = self.__GetIntervalTimingInt()
         dt_SelectedDate = datetime.strptime(str_Date, self.str_DateTimeFormat)
-        dt_SelectedDate = self.__GetNewTradingDate(dt_SelectedDate, -i_Intervaltime * i_Period, True)
+        dict_DateResult = self.__GetNewTradingDate_Dictionary(dt_SelectedDate, -i_Intervaltime * i_Period)
+        dt_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
         # Calculate SMA
         f_SMA = 0.0
         dict_PrevPrices = self.GetPreviousDatePrices(dt_SelectedDate, i_Period, False)
@@ -129,129 +134,62 @@ class AVData:
             f_EMA = (value - f_EMA) * f_Smoother + f_EMA
         return f_EMA
 
-    # def CalculateLatestEMA(self):
-    #     f_SMA = 0.0
-    #     i_SMALength = 100
-    #     i_EMALength = 450
-    #     i_Intervaltime = self.__GetIntervalTimingInt()
-    #     dt_SelectedDate = self.__GetNewTradingDate(self.dt_LatestDataTime, -i_Intervaltime * i_EMALength, True)
-    #     # Calculate SMA
-    #     dict_PrevPrices = self.GetPreviousDatePrices(dt_SelectedDate, i_SMALength, False)
-    #     for key, value in dict_PrevPrices.items():
-    #         f_SMA += value
-    #     f_SMA /= i_SMALength
-    #     f_Smoother = 2 / (i_EMALength + 1)
-    #     # Calculate EMA
-    #     self.dict_EMA = dict()
-    #     f_EMA = f_SMA
-    #     dt_SelectedDate = self.dt_LatestDataTime
-    #     dict_PrevPrices = self.GetPreviousDatePrices(dt_SelectedDate, i_EMALength)
-    #     for key, value in dict_PrevPrices.items():
-    #         self.dict_EMA[key] = value
-    #         f_EMA = (value - f_EMA) * f_Smoother + f_EMA
-    #         # print(key + ": " + str(value))
-    #     return
-
     def GetDayPrices(self, dt_Date):
-        dt_CurrDate = dt_Date
-        dt_CurrDate = dt_CurrDate.replace(hour=9,minute=31,second=0)
-        str_CurrDate = dt_CurrDate.strftime(self.str_DateTimeFormat)
+        # Prices only in that Day
+        str_CurrDate = dt_Date.strftime(self.str_DateTimeFormat)
+        str_CurrDate = str_CurrDate.split()
+        str_TempDate = ""
         i_Intervaltime = self.__GetIntervalTimingInt()
-        # Prices only in that Day 
+        list_APIDataKeys = list(self.apiData.keys())
         datePrices = dict()
-        datePrices[str_CurrDate] = self.apiData.get(str_CurrDate)[AVDataIndex.Close.value]
-        while dt_CurrDate.hour != 16 or dt_CurrDate.minute != 0:
-            # Fetch prices
-            dt_CurrDate = self.__GetNewTradingDate(dt_CurrDate, i_Intervaltime)
-            str_CurrDate = dt_CurrDate.strftime(self.str_DateTimeFormat)
-            # Current Date doesn't exist
-            if self.apiData.get(str_CurrDate) is None:
-                dt_TempDate = self.__GetPreviousValidAPIDate(dt_CurrDate)
-                str_TempDate = dt_TempDate.strftime(self.str_DateTimeFormat)
-                # Replace Current Date value with Previous Date value
-                datePrices[str_CurrDate] = self.apiData.get(str_TempDate)[AVDataIndex.Close.value]
-            # Date exists   
+        for index, value in enumerate(list_APIDataKeys):
+            str_TempDate = value.split()
+            if str_TempDate[0] == str_CurrDate[0]:
+                datePrices[value] = self.apiData[value][AVDataIndex.Close.value]
             else:
-                datePrices[str_CurrDate] = self.apiData.get(str_CurrDate)[AVDataIndex.Close.value]
+                break
         return datePrices
 
     def GetPreviousDatePrices(self, dt_Date, i_Range, b_AttachCurrentDate = True):
         datePrices = dict()
-        dt_SelectedDate = self.__GetNewTradingDate(dt_Date, -(i_Range+1), True)
+        dict_DateResult = self.__GetNewTradingDate_Dictionary(dt_Date, -(i_Range+1))
+        dt_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
         str_SelectedDate = dt_SelectedDate.strftime(self.str_DateTimeFormat)
         i_Intervaltime = self.__GetIntervalTimingInt()
         # Prices before dt_Date
         # Loop through all Previous dates
         for index in range(i_Range):
-            dt_SelectedDate = self.__GetNewTradingDate(dt_SelectedDate, i_Intervaltime, True)
+            dict_DateResult = self.__GetNewTradingDate_Dictionary(dt_SelectedDate, i_Intervaltime, dict_DateResult[AVDataTraverse.Index.value])
+            dt_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
             str_SelectedDate = dt_SelectedDate.strftime(self.str_DateTimeFormat)
-            # Date not valid
-            if self.apiData.get(str_SelectedDate) is None:
-                dt_TempDate = self.__GetPreviousValidAPIDate(dt_SelectedDate)
-                str_TempDate = dt_TempDate.strftime(self.str_DateTimeFormat)
-                datePrices[str_SelectedDate] = float(self.apiData.get(str_TempDate)[AVDataIndex.Close.value])
-            else:
-                datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
+            datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
         # Attach dt_Date into back of Dictionary?
         if b_AttachCurrentDate == False:
             return datePrices
-        # Current Date doesn't exist
+        # Current Date
         dt_SelectedDate = dt_Date
         str_SelectedDate = dt_SelectedDate.strftime(self.str_DateTimeFormat)
-        datePrices[str_SelectedDate] = 0.0
-        if self.apiData.get(str_SelectedDate) is None:
-            dt_TempDate = self.__GetPreviousValidAPIDate(dt_Date)
-            str_TempDate = dt_TempDate.strftime(self.str_DateTimeFormat)
-            datePrices[str_SelectedDate] = float(self.apiData.get(str_TempDate)[AVDataIndex.Close.value])
-        else:
-            datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
-        
+        datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
         return datePrices
 
     def __GetIntervalTimingInt(self):
         timing = self.str_IntervalTime.split("min")
         return int(timing[0])
-    
-    def __GetNewTradingDate(self, dt_OldDate, i_MinuteModifiy, b_AttachOverflowed = False):
-        dt_NewDate = dt_OldDate
-        dt_NewDate = dt_OldDate + timedelta(minutes=i_MinuteModifiy)
-        dt_Diff = dt_NewDate
-        # Check if Time out of Bounds
-        if dt_NewDate.time() < self.dt_AVTimeLowerBounds.time():
-            # 30 instead of 31, to keep account for 9:30 to 16:0 conversion
-            dt_Diff = dt_Diff.replace(hour=9,minute=30,second=0)
-            dt_Diff = dt_Diff - dt_NewDate
-            dt_NewDate = dt_NewDate.replace(hour=16,minute=0,second=0)
-            # Attach Overflowed minutes
-            if b_AttachOverflowed:
-                dt_NewDate = dt_NewDate - timedelta(minutes=dt_Diff.seconds/60)
-            # Check for Weekends
-            if dt_NewDate.weekday() == 0:
-                dt_NewDate = dt_NewDate - timedelta(days=3)
-            else:
-                dt_NewDate = dt_NewDate - timedelta(days=1)
-        elif dt_NewDate.time() > self.dt_AVTimeUpperBounds.time():
-            dt_Diff = dt_Diff.replace(hour=16,minute=0,second=0)
-            dt_Diff = dt_NewDate - dt_Diff
-            dt_NewDate = dt_NewDate.replace(hour=9,minute=30,second=0)
-            # Attach Overflowed minutes
-            if b_AttachOverflowed:
-                dt_NewDate = dt_NewDate + timedelta(minutes=dt_Diff.seconds/60)
-            # Check for Weekends
-            if dt_NewDate.weekday() == 4:
-                dt_NewDate = dt_NewDate + timedelta(days=3)
-            else:
-                dt_NewDate = dt_NewDate + timedelta(days=1)
 
-        return dt_NewDate
-
-    def __GetPreviousValidAPIDate(self, dt_InvalidDate):
-        dt_validDate = dt_InvalidDate
-        str_validDate = dt_validDate.strftime(self.str_DateTimeFormat)
-        i_Intervaltime = self.__GetIntervalTimingInt()
-        # Find Date that exists in API Data
-        while self.apiData.get(str_validDate) is None:
-            dt_validDate = self.__GetNewTradingDate(dt_validDate, -i_Intervaltime)
-            str_validDate = dt_validDate.strftime(self.str_DateTimeFormat)
-        return dt_validDate
+    def __GetNewTradingDate_Dictionary(self, dt_OldDate, i_TraverseCount, i_StartingIndex = -1):
+        dict_Result = dict()
+        list_APIDataKeys = list(self.apiData.keys())
+        if i_StartingIndex < 0:
+            str_OldDate = dt_OldDate.strftime(self.str_DateTimeFormat)
+            if str_OldDate in self.apiData is None:
+                return None
+            i_StartingIndex = list_APIDataKeys.index(str_OldDate)
+        i_StartingIndex -= i_TraverseCount
+        if i_StartingIndex < 0:
+            return None
+        dt_NewDate = datetime.strptime(list_APIDataKeys[i_StartingIndex], self.str_DateTimeFormat)
+        dict_Result[AVDataTraverse.NewDate.value] = dt_NewDate
+        dict_Result[AVDataTraverse.Index.value] = i_StartingIndex 
+        return dict_Result
+        
     

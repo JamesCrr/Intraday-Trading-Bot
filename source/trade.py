@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from avdata import AVData, AVDataIndex, MACDIndex
+from avdata import AVData, AVDataIndex, AVDataTraverse, MACDIndex
 from account import TradeAccount
 import time
 import pytz
@@ -37,17 +37,16 @@ class TradeBot:
         # Fetch Equity Data
         for EquityName in self.TradeAccount.GetSelectedEquityNames():
             self.AVData.FetchEquityData(EquityName, True)
-            # self.AVData.CalculateLatestEMA()
             if self.TradeAccount.GetEquityEntryPrice(EquityName) != 0.0:
                 b_Bought = True
             print("Now Trading -> " + EquityName + " \nPlease Hold...")
             i_BeforeBalance = self.TradeAccount.GetTotalFunds()
             i_TradeCount = 0
-
+            i_DateIndex = 0
             # Go through all Prices in Day
             for key, value in self.AVData.GetDayPrices(self.AVData.dt_LatestDataTime).items():
-                f_RSI = self.AVData.FetchRSI(key)
-                dict_MACD = self.AVData.FetchMACD(key)
+                f_RSI = self.AVData.FetchRSI(key, i_DateIndex)
+                dict_MACD = self.AVData.FetchMACD(key, i_DateIndex)
 
                 if b_Bought == False:
                     # Buy
@@ -63,7 +62,8 @@ class TradeBot:
                     self.TradeAccount.SetEquityFundStake(EquityName, float(value))
                     i_TradeCount += 1
                     b_Bought = False
-            
+                i_DateIndex += 1
+
             print("**********  Trade End  **********")
             print("Balance BEFORE trade : " + str(i_BeforeBalance))
             print("Balance AFTER trade  : " + str(self.TradeAccount.GetTotalFunds()))
@@ -71,7 +71,7 @@ class TradeBot:
             print("Net Gain             : " + str(((self.TradeAccount.GetTotalFunds()-i_BeforeBalance)/i_BeforeBalance)*100.0)  + " %")
             print("*********************************\n")
             i_TotalTradeCount += i_TradeCount
-            # break
+            break
         
         print("============  End of Day  =============")
         print("Starting Balance : " + str(f_StartBalance))
@@ -79,6 +79,11 @@ class TradeBot:
         print("Trade Counts     : " + str(i_TotalTradeCount))
         print("Net Gain         : " + str(((self.TradeAccount.GetTotalFunds()-f_StartBalance)/f_StartBalance)*100.0)  + " %")
         print("=======================================")
+
+        # prevDate = datetime.strptime("2020-07-2 16:0:00", self.AVData.str_DateTimeFormat)
+        # dict_Result = self.AVData.GetNewTradingDate_Dictionary(prevDate, -5)
+        # print("NewDate: " + dict_Result[AVDataTraverse.NewDate.value].strftime(self.AVData.str_DateTimeFormat))
+
         # dayprices = self.AVData.GetDayPrices(self.AVData.dt_LatestDataTime)
         # for k, v in dayprices.items():
         #     print(k + " | " + str(v))
