@@ -68,8 +68,8 @@ class TradeBot:
             print("************  Trade End  **************")
             print("Balance BEFORE trade : " + str(i_BeforeBalance))
             print("Balance AFTER trade  : " + str(self.TradeAccount.GetTotalFunds()))
-            print("Trade Counts         : " + str(i_TradeCount))
-            print("Net Gain             : " + str(((self.TradeAccount.GetTotalFunds()-i_BeforeBalance)/i_BeforeBalance)*100.0)  + " %")
+            print("Trade Count          : " + str(i_TradeCount))
+            print("Trade Net Gain       : " + str(((self.TradeAccount.GetTotalFunds()-i_BeforeBalance)/i_BeforeBalance)*100.0)  + " %")
             print("***************************************\n")
             i_TotalTradeCount += i_TradeCount
             # break
@@ -77,7 +77,7 @@ class TradeBot:
         print("================  End of Day  =================")
         print("Starting Balance : " + str(f_StartBalance))
         print("Ending Balance   : " + str(self.TradeAccount.GetTotalFunds()))
-        print("Trade Counts     : " + str(i_TotalTradeCount))
+        print("Total Trades     : " + str(i_TotalTradeCount))
         print("Net Gain         : " + str(((self.TradeAccount.GetTotalFunds()-f_StartBalance)/f_StartBalance)*100.0)  + " %")
         print("===============================================")
 
