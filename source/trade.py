@@ -39,7 +39,8 @@ class TradeBot:
             self.AVData.FetchEquityData(EquityName, True)
             if self.TradeAccount.GetEquityEntryPrice(EquityName) != 0.0:
                 b_Bought = True
-            print("Now Trading -> " + EquityName + " \nPlease Hold...")
+            print("***************************************")
+            print("Now Trading ->   " + EquityName + " \nPlease Hold...")
             i_BeforeBalance = self.TradeAccount.GetTotalFunds()
             i_TradeCount = 0
             i_DateIndex = 0
@@ -64,21 +65,21 @@ class TradeBot:
                     b_Bought = False
                 i_DateIndex += 1
 
-            print("**********  Trade End  **********")
+            print("************  Trade End  **************")
             print("Balance BEFORE trade : " + str(i_BeforeBalance))
             print("Balance AFTER trade  : " + str(self.TradeAccount.GetTotalFunds()))
             print("Trade Counts         : " + str(i_TradeCount))
             print("Net Gain             : " + str(((self.TradeAccount.GetTotalFunds()-i_BeforeBalance)/i_BeforeBalance)*100.0)  + " %")
-            print("*********************************\n")
+            print("***************************************\n")
             i_TotalTradeCount += i_TradeCount
-            break
+            # break
         
-        print("============  End of Day  =============")
+        print("================  End of Day  =================")
         print("Starting Balance : " + str(f_StartBalance))
         print("Ending Balance   : " + str(self.TradeAccount.GetTotalFunds()))
         print("Trade Counts     : " + str(i_TotalTradeCount))
         print("Net Gain         : " + str(((self.TradeAccount.GetTotalFunds()-f_StartBalance)/f_StartBalance)*100.0)  + " %")
-        print("=======================================")
+        print("===============================================")
 
         # prevDate = datetime.strptime("2020-07-2 16:0:00", self.AVData.str_DateTimeFormat)
         # dict_Result = self.AVData.GetNewTradingDate_Dictionary(prevDate, -5)
