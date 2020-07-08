@@ -5,14 +5,14 @@ import enum
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.techindicators import TechIndicators
 
-class AVDataTraverse(enum.Enum):
+class AVDATATRAVERSE(enum.Enum):
     NewDate = "newDate"
     Index = "index"
-class MACDIndex(enum.Enum):
+class MACDINDEX(enum.Enum):
     MACDLine = "diff"
     SignalLine = "signal"
     Histogram = "hist"
-class AVDataIndex(enum.Enum):
+class AVDATAINDEX(enum.Enum):
     Open = "1. open"
     High = "2. high"
     Low = "3. low"
@@ -31,8 +31,8 @@ class AVData:
         # self.dict_EMA = None
 
     def FetchEquityData(self, str_Name, b_FullSize):
-        print("============  API Call  ===============")
-        print("Fetching [" + str_Name + "] Equity Data")
+        # print("============  API Call  ===============")
+        # print("Fetching [" + str_Name + "] Equity Data")
         # Full Market data or just Latest
         # Get json object with the intraday data and another with the call's metadata
         if b_FullSize:
@@ -44,13 +44,13 @@ class AVData:
         newTime = list(self.apiData.keys())[0] 
         self.dt_LatestDataTime = datetime.strptime(newTime, self.str_DateTimeFormat)
         newTime = newTime.split()
-        print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
-        print("=======================================\n")
+        # print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
+        # print("=======================================\n")
 
     def FetchRSI(self, str_Date, i_DateIndex, i_Period = 14):
         i_Intervaltime = self.__GetIntervalTimingInt()
         dict_DateResult = self.__GetNewTradingDate_Dictionary("", -i_Intervaltime * i_Period, i_DateIndex)
-        str_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value] 
+        str_SelectedDate = dict_DateResult[AVDATATRAVERSE.NewDate.value] 
         f_AverageGains = 0.0
         f_AverageLosts = 0.0
         f_PriceDiff = 0.0
@@ -93,7 +93,7 @@ class AVData:
         dict_MACD = dict()
         i_Intervaltime = self.__GetIntervalTimingInt()
         dict_DateResult = self.__GetNewTradingDate_Dictionary("", -i_Intervaltime * i_SignalPeriod, i_DateIndex)
-        str_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
+        str_SelectedDate = dict_DateResult[AVDATATRAVERSE.NewDate.value]
         # Signal SMA
         f_SignalEMA = 0.0
         f_Smoother = 2 / (i_SignalPeriod + 1)
@@ -108,16 +108,16 @@ class AVData:
             f_EMADiff = self.FetchEMA(key, i_FastPeriod)-self.FetchEMA(key, i_SlowPeriod)
             f_SignalEMA = (f_EMADiff - f_SignalEMA) * f_Smoother + f_SignalEMA
         # Record
-        dict_MACD[MACDIndex.MACDLine.value] = self.FetchEMA(str_Date, i_FastPeriod) - self.FetchEMA(str_Date, i_SlowPeriod)
-        dict_MACD[MACDIndex.SignalLine.value] = f_SignalEMA
-        dict_MACD[MACDIndex.Histogram.value] = dict_MACD[MACDIndex.MACDLine.value] - f_SignalEMA
+        dict_MACD[MACDINDEX.MACDLine.value] = self.FetchEMA(str_Date, i_FastPeriod) - self.FetchEMA(str_Date, i_SlowPeriod)
+        dict_MACD[MACDINDEX.SignalLine.value] = f_SignalEMA
+        dict_MACD[MACDINDEX.Histogram.value] = dict_MACD[MACDINDEX.MACDLine.value] - f_SignalEMA
         return dict_MACD
 
 
     def FetchEMA(self, str_Date, i_Period):
         i_Intervaltime = self.__GetIntervalTimingInt()
         dict_DateResult = self.__GetNewTradingDate_Dictionary(str_Date, -i_Intervaltime * i_Period)
-        str_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
+        str_SelectedDate = dict_DateResult[AVDATATRAVERSE.NewDate.value]
         # Calculate SMA
         f_SMA = 0.0
         dict_PrevPrices = self.GetPreviousDatePrices(str_SelectedDate, i_Period, False)
@@ -144,7 +144,7 @@ class AVData:
         for index, value in enumerate(list_APIDataKeys):
             str_TempDate = value.split()
             if str_TempDate[0] == str_CurrDate[0]:
-                datePrices[value] = self.apiData[value][AVDataIndex.Close.value]
+                datePrices[value] = self.apiData[value][AVDATAINDEX.Close.value]
             else:
                 break
         return datePrices
@@ -152,20 +152,20 @@ class AVData:
     def GetPreviousDatePrices(self, str_Date, i_Range, b_AttachCurrentDate = True):
         datePrices = dict()
         dict_DateResult = self.__GetNewTradingDate_Dictionary(str_Date, -(i_Range+1))
-        str_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
+        str_SelectedDate = dict_DateResult[AVDATATRAVERSE.NewDate.value]
         i_Intervaltime = self.__GetIntervalTimingInt()
         # Prices before str_Date
         # Loop through all Previous dates
         for index in range(i_Range):
-            dict_DateResult = self.__GetNewTradingDate_Dictionary(str_SelectedDate, i_Intervaltime, dict_DateResult[AVDataTraverse.Index.value])
-            str_SelectedDate = dict_DateResult[AVDataTraverse.NewDate.value]
-            datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
+            dict_DateResult = self.__GetNewTradingDate_Dictionary(str_SelectedDate, i_Intervaltime, dict_DateResult[AVDATATRAVERSE.Index.value])
+            str_SelectedDate = dict_DateResult[AVDATATRAVERSE.NewDate.value]
+            datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDATAINDEX.Close.value])
         # Attach str_Date into back of Dictionary?
         if b_AttachCurrentDate == False:
             return datePrices
         # Current Date
         str_SelectedDate = str_Date
-        datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDataIndex.Close.value])
+        datePrices[str_SelectedDate] = float(self.apiData.get(str_SelectedDate)[AVDATAINDEX.Close.value])
         return datePrices
 
     def __GetIntervalTimingInt(self):
@@ -182,8 +182,8 @@ class AVData:
         i_StartingIndex -= i_TraverseCount
         if i_StartingIndex < 0:
             return None
-        dict_Result[AVDataTraverse.NewDate.value] = list_APIDataKeys[i_StartingIndex]
-        dict_Result[AVDataTraverse.Index.value] = i_StartingIndex 
+        dict_Result[AVDATATRAVERSE.NewDate.value] = list_APIDataKeys[i_StartingIndex]
+        dict_Result[AVDATATRAVERSE.Index.value] = i_StartingIndex 
         return dict_Result
         
     
