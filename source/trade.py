@@ -67,7 +67,7 @@ class TradeBot:
         self.__PrintTradeOpening(str_EquityName, TRADESTRATEGY.RSI_MACD)
         b_Bought = False
         i_TradeCount = 0
-        i_BeforeBalance = self.TradeAccount.GetTotalFunds()
+        i_BeforeBalance = self.TradeAccount.GetEquityFundStake(str_EquityName)
         dict_DayPrices = self.AVData.GetDayPrices(self.AVData.dt_LatestDataTime)
         i_DateIndex = len(dict_DayPrices) - 1
         if self.TradeAccount.GetEquityEntryPrice(str_EquityName) != 0.0:
@@ -88,7 +88,11 @@ class TradeBot:
                 # Sell
                 if f_RSI < 65 or dict_MACD[MACDINDEX.Histogram.value] < 0:
                     continue
-                self.TradeAccount.SetEquityFundStake(str_EquityName, float(value))
+                f_EntryPrice = self.TradeAccount.GetEquityEntryPrice(str_EquityName)
+                f_FundStake = self.TradeAccount.GetEquityFundStake(str_EquityName)
+                f_PercentageDiff = float(value) / f_EntryPrice
+                f_FundStake *= f_PercentageDiff
+                self.TradeAccount.SetEquityFundStake(str_EquityName, f_FundStake)
                 i_TradeCount += 1
                 b_Bought = False
             i_DateIndex -= 1
@@ -121,10 +125,10 @@ class TradeBot:
     def __PrintTradeClosing(self, str_EquityName, i_InitialBalance, i_TradeCount):
         print("**************  Trade End  ****************")
         print("Balance BEFORE trade : " + str(i_InitialBalance))
-        print("Balance AFTER trade  : " + str(self.TradeAccount.GetTotalFunds()))
+        print("Balance AFTER trade  : " + str(self.TradeAccount.GetEquityFundStake(str_EquityName)))
         print("Trade Count          : " + str(i_TradeCount))
-        print("Trade Gain $         : " + str(self.TradeAccount.GetTotalFunds() - i_InitialBalance))
-        print("Trade Gain %         : " + str(((self.TradeAccount.GetTotalFunds()-i_InitialBalance)/i_InitialBalance)*100.0)  + " %")
+        print("Trade Gain $         : " + str(self.TradeAccount.GetEquityFundStake(str_EquityName) - i_InitialBalance))
+        print("Trade Gain %         : " + str(((self.TradeAccount.GetEquityFundStake(str_EquityName)-i_InitialBalance)/i_InitialBalance)*100.0)  + " %")
         print("*******************************************\n")
     def __PrintStateOpening(self, str_StateName):
         print("\n[------- " + str_StateName + " -------]")
