@@ -13,18 +13,25 @@ class TradeAccount:
         self.__str_dataDirPath = os.path.join(os.getcwd(), "data")
         self.__str_dataFilePath = os.path.join(os.getcwd(), "data", self.__str_dataFileName)
 
-    def GetSelectedEquityNames(self):
-        list_SelectedEquities = list()
-        for key, value in self.dict_Account[str_AccTotalEquities].items():
-            list_SelectedEquities.append(key)
-        return list_SelectedEquities
+    def ModifyTotalFunds(self, f_Amount):
+        self.dict_Account[str_AccTotalFunds] += f_Amount
     def GetTotalFunds(self):
         return self.dict_Account[str_AccTotalFunds]
     def GetRemainderFunds(self):
         f_takenFunds = 0.0
         for key, value in self.dict_Account[str_AccTotalEquities].items():
             f_takenFunds += value[str_EquityFundStake]
-        return self.GetTotalFunds() - f_takenFunds
+        return round(self.GetTotalFunds() - f_takenFunds, 1)
+    def ReplaceEquity(self, str_OldEquityName, str_NewEquityName):
+        del self.dict_Account[str_AccTotalEquities][str_OldEquityName]
+        self.dict_Account[str_AccTotalEquities][str_NewEquityName] = dict()
+        self.dict_Account[str_AccTotalEquities][str_NewEquityName][str_EquityEntryPrice] = 0.0
+        self.dict_Account[str_AccTotalEquities][str_NewEquityName][str_EquityFundStake] = 0.0
+    def GetSelectedEquityNames(self):
+        list_SelectedEquities = list()
+        for key, value in self.dict_Account[str_AccTotalEquities].items():
+            list_SelectedEquities.append(key)
+        return list_SelectedEquities
 
     def GetEquityEntryPrice(self, str_Name):
         if self.dict_Account[str_AccTotalEquities].get(str_Name) is None:
@@ -47,6 +54,11 @@ class TradeAccount:
         self.dict_Account[str_AccTotalEquities][str_Name][str_EquityFundStake] = f_NewValue
         # Add back to Total fund to reflect change in price
         self.dict_Account[str_AccTotalFunds] += self.dict_Account[str_AccTotalEquities][str_Name][str_EquityFundStake]
+        return True
+    def SetEquityFundStake_NotSale(self, str_Name, f_NewValue):
+        if self.dict_Account[str_AccTotalEquities].get(str_Name) is None:
+            return False
+        self.dict_Account[str_AccTotalEquities][str_Name][str_EquityFundStake] = f_NewValue
         return True
 
     def SaveToFile(self):

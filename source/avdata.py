@@ -35,10 +35,13 @@ class AVData:
         # print("Fetching [" + str_Name + "] Equity Data")
         # Full Market data or just Latest
         # Get json object with the intraday data and another with the call's metadata
-        if b_FullSize:
-            self.apiData, meta_data = self.ts.get_intraday(symbol=str_Name, interval=self.str_IntervalTime, outputsize="full")
-        else:
-            self.apiData, meta_data = self.ts.get_intraday(symbol=str_Name, interval=self.str_IntervalTime, outputsize="compact")
+        try:
+            if b_FullSize:
+                self.apiData, meta_data = self.ts.get_intraday(symbol=str_Name, interval=self.str_IntervalTime, outputsize="full")
+            else:
+                self.apiData, meta_data = self.ts.get_intraday(symbol=str_Name, interval=self.str_IntervalTime, outputsize="compact")
+        except ValueError:
+            return False
         
         # Get latest time from data
         newTime = list(self.apiData.keys())[0] 
@@ -46,6 +49,7 @@ class AVData:
         newTime = newTime.split()
         # print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
         # print("=======================================\n")
+        return True
 
     def FetchRSI(self, str_Date, i_DateIndex, i_Period = 14):
         i_Intervaltime = self.__GetIntervalTimingInt()
@@ -112,7 +116,6 @@ class AVData:
         dict_MACD[MACDINDEX.SignalLine.value] = f_SignalEMA
         dict_MACD[MACDINDEX.Histogram.value] = dict_MACD[MACDINDEX.MACDLine.value] - f_SignalEMA
         return dict_MACD
-
 
     def FetchEMA(self, str_Date, i_Period):
         i_Intervaltime = self.__GetIntervalTimingInt()
