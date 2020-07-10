@@ -9,12 +9,14 @@ str_EquityFundStake = "fundStake"
 class TradeAccount:
     def __init__(self):
         self.dict_Account = None
+        self.b_DictChanges = False
         self.__str_dataFileName = "account-info.json"
         self.__str_dataDirPath = os.path.join(os.getcwd(), "data")
         self.__str_dataFilePath = os.path.join(os.getcwd(), "data", self.__str_dataFileName)
 
     def ModifyTotalFunds(self, f_Amount):
         self.dict_Account[str_AccTotalFunds] += f_Amount
+        self.b_DictChanges = True
     def GetTotalFunds(self):
         return self.dict_Account[str_AccTotalFunds]
     def GetRemainderFunds(self):
@@ -27,6 +29,7 @@ class TradeAccount:
         self.dict_Account[str_AccTotalEquities][str_NewEquityName] = dict()
         self.dict_Account[str_AccTotalEquities][str_NewEquityName][str_EquityEntryPrice] = 0.0
         self.dict_Account[str_AccTotalEquities][str_NewEquityName][str_EquityFundStake] = 0.0
+        self.b_DictChanges = True
     def GetSelectedEquityNames(self):
         list_SelectedEquities = list()
         for key, value in self.dict_Account[str_AccTotalEquities].items():
@@ -45,6 +48,7 @@ class TradeAccount:
         if self.dict_Account[str_AccTotalEquities].get(str_Name) is None:
             return False
         self.dict_Account[str_AccTotalEquities][str_Name][str_EquityEntryPrice] = f_NewValue
+        self.b_DictChanges = True
         return True
     def SetEquityFundStake(self, str_Name, f_NewValue):
         if self.dict_Account[str_AccTotalEquities].get(str_Name) is None:
@@ -54,11 +58,13 @@ class TradeAccount:
         self.dict_Account[str_AccTotalEquities][str_Name][str_EquityFundStake] = f_NewValue
         # Add back to Total fund to reflect change in price
         self.dict_Account[str_AccTotalFunds] += self.dict_Account[str_AccTotalEquities][str_Name][str_EquityFundStake]
+        self.b_DictChanges = True
         return True
     def SetEquityFundStake_NotSale(self, str_Name, f_NewValue):
         if self.dict_Account[str_AccTotalEquities].get(str_Name) is None:
             return False
         self.dict_Account[str_AccTotalEquities][str_Name][str_EquityFundStake] = f_NewValue
+        self.b_DictChanges = True
         return True
 
     def SaveToFile(self):
@@ -68,7 +74,8 @@ class TradeAccount:
             return False
         with open(self.__str_dataFilePath, 'w+') as outFile:
             json.dump(self.dict_Account, outFile)
-        print("Data Saved")
+        print("Account Data Saved")
+        self.b_DictChanges = False
         return True
 
     def LoadFromFile(self):
@@ -78,6 +85,7 @@ class TradeAccount:
             return False
         with open(self.__str_dataFilePath) as jsonFile:
             self.dict_Account = json.load(jsonFile)
+        self.b_DictChanges = False
         return True
 
     def CreateNewAccount(self):
@@ -85,6 +93,7 @@ class TradeAccount:
         self.dict_Account = dict()
         self.dict_Account[str_AccTotalFunds] = 1000.0
         self.dict_Account[str_AccTotalEquities] = dict()
+        self.b_DictChanges = False
 
         list_DefaultEquities = ["WIX", "IBM", "APRN"]
         for name in list_DefaultEquities:

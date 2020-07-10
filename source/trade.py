@@ -48,7 +48,13 @@ class TradeBot:
         print("Total Gain $     : " + str(self.TradeAccount.GetTotalFunds() - f_StartBalance))
         print("Total Gain %     : " + str(((self.TradeAccount.GetTotalFunds()-f_StartBalance)/f_StartBalance)*100.0)  + " %")
         print("===============================================")
-
+        # Confirmation
+        print("Save new Fund Balance to Account?")
+        b_YesNo = self.__GetConfirmationInput()
+        if b_YesNo == False:
+            print("Trades discarded, NO Changes were made to Account")
+            return
+        self.TradeAccount.SaveToFile()
         # prevDate = datetime.strptime("2020-07-2 16:0:00", self.AVData.str_DateTimeFormat)
         # dict_Result = self.AVData.GetNewTradingDate_Dictionary(prevDate, -5)
         # print("NewDate: " + dict_Result[AVDATATRAVERSE.NewDate.value].strftime(self.AVData.str_DateTimeFormat))
@@ -93,6 +99,7 @@ class TradeBot:
                 f_PercentageDiff = float(value) / f_EntryPrice
                 f_FundStake *= f_PercentageDiff
                 self.TradeAccount.SetEquityFundStake(str_EquityName, f_FundStake)
+                self.TradeAccount.SetEquityEntryPrice(str_EquityName, 0.0)
                 i_TradeCount += 1
                 b_Bought = False
             i_DateIndex -= 1
@@ -153,10 +160,10 @@ class TradeBot:
         print("NYC Time: " + self.__GetNYCTime())
         b_MarketStillOpen = self.__MarketStillOpen()
         if b_MarketStillOpen:
-            print("[1] Real-Time Trade")
+            print("[1] Trade (Real-Time)")
         else:
-            print("[̶1̶]̶ ̶R̶e̶a̶l̶-̶T̶i̶m̶e̶ ̶T̶r̶a̶d̶e̶")
-        print("[2] Simulate-Past-Day Trade")
+            print("[̶1̶]̶ ̶T̶r̶a̶d̶e̶ ̶(̶R̶e̶a̶l̶-̶T̶i̶m̶e̶)")
+        print("[2] Trade (Simulate-Past-Day)")
         print("[3] Settings")
         print("[4] Exit")
         self.__PrintStateClosing(str_StateName)
@@ -179,10 +186,11 @@ class TradeBot:
         print("[1] Inject Funds")
         print("[2] Change Equity Traded")
         print("[3] Change Equity Fund Amount")
-        print("[4] Back")
+        print("[4] View Account Details")
+        print("[5] Back")
         self.__PrintStateClosing(str_StateName)
         
-        i_Result = self.__GetIntRangeInput(1,4)
+        i_Result = self.__GetIntRangeInput(1,5)
         if i_Result == 1:
            self.__StateSettings_ModifyFunds()
         if i_Result == 2:
@@ -190,6 +198,11 @@ class TradeBot:
         elif i_Result == 3:
             self.__StateSettings_ChangeEquityFund()
         elif i_Result == 4:
+            self.__PrintAccountDetails()
+            self.__StateSettings()
+        elif i_Result == 5:
+            if self.TradeAccount.b_DictChanges:
+                self.TradeAccount.SaveToFile()
             self.__StateMainMenu()
     def __StateSettings_ModifyFunds(self):
         f_RemovableFunds = self.TradeAccount.GetRemainderFunds()
