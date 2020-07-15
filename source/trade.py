@@ -27,20 +27,26 @@ class TradeBot:
         print("Exiting Program..")
 
     def __StartTrading_RealTime(self):
-        return
-
-    def __StartTrading_SimulatePastDay(self):
-
         i_TotalTradeCount = 0
         f_StartBalance = self.TradeAccount.GetTotalFunds()
+        dt_PreviousDatetime = datetime.now()
+        str_PrintResults = ""
         dict_Results = None
-        # Fetch Equity Data
-        for EquityName in self.TradeAccount.GetSelectedEquityNames():
-            self.AVData.FetchEquityData(EquityName, True)
-            dict_Results = self.__Trade_RSI_MACD(EquityName)
-            i_TotalTradeCount += dict_Results[TRADEDETAILS.TradeCount]
-            # break
-        
+        while dt_PreviousDatetime != self.AVData.dt_LatestDataTime:
+            # Fetch Equity Data
+            for EquityName in self.TradeAccount.GetSelectedEquityNames():
+                self.AVData.FetchEquityData(EquityName, False)
+                dict_Results = self.__TradeLastEntry_RSI_MACD(EquityName)
+                i_TotalTradeCount += dict_Results[TRADEDETAILS.TradeCount]
+                str_PrintResults = self.AVData.str_LatestDataTime + " (" + EquityName + "): "
+                if dict_Results[TRADEDETAILS.TradeCount] != 0:
+                    str_PrintResults += "Traded!"
+                print(str_PrintResults)
+            # Record down latest time
+            dt_PreviousDatetime = self.AVData.dt_LatestDataTime
+            # Wait until next minute (with a small 1 sec delay)
+            # To make sure API calls at next minute
+            time.sleep(61 - datetime.now().second)
         print("================  End of Day  =================")
         print("Starting Balance : " + str(f_StartBalance))
         print("Ending Balance   : " + str(self.TradeAccount.GetTotalFunds()))
@@ -53,6 +59,32 @@ class TradeBot:
         b_YesNo = self.__GetConfirmationInput()
         if b_YesNo == False:
             print("Trades discarded, NO Changes were made to Account")
+            return
+        self.TradeAccount.SaveToFile()
+
+    def __StartTrading_SimulatePastDay(self):
+        i_TotalTradeCount = 0
+        f_StartBalance = self.TradeAccount.GetTotalFunds()
+        dict_Results = None
+        # Fetch Equity Data
+        for EquityName in self.TradeAccount.GetSelectedEquityNames():
+            self.AVData.FetchEquityData(EquityName, True)
+            dict_Results = self.__TradeWholeDay_RSI_MACD(EquityName)
+            i_TotalTradeCount += dict_Results[TRADEDETAILS.TradeCount]
+            # break        
+        print("================  End of Day  =================")
+        print("Starting Balance : " + str(f_StartBalance))
+        print("Ending Balance   : " + str(self.TradeAccount.GetTotalFunds()))
+        print("Total Trades     : " + str(i_TotalTradeCount))
+        print("Total Gain $     : " + str(self.TradeAccount.GetTotalFunds() - f_StartBalance))
+        print("Total Gain %     : " + str(((self.TradeAccount.GetTotalFunds()-f_StartBalance)/f_StartBalance)*100.0)  + " %")
+        print("===============================================")
+        # Confirmation
+        print("Save new Fund Balance to Account?")
+        b_YesNo = self.__GetConfirmationInput()
+        if b_YesNo == False:
+            print("Trades discarded, NO Changes were made to Account")
+            self.TradeAccount.LoadFromFile()
             return
         self.TradeAccount.SaveToFile()
         # prevDate = datetime.strptime("2020-07-2 16:0:00", self.AVData.str_DateTimeFormat)
@@ -68,9 +100,37 @@ class TradeBot:
         # for k, v in prevprices.items():
         #     print(k + " | " + str(v))
         
-    def __Trade_RSI_MACD(self, str_EquityName):
+    def __TradeLastEntry_RSI_MACD(self, str_EquityName):
+        b_Bought = False
+        i_TradeCount = 0
+        i_BeforeBalance = self.TradeAccount.GetEquityFundStake(str_EquityName)
+        str_Key = self.AVData.str_LatestDataTime
+        if self.TradeAccount.GetEquityEntryPrice(str_EquityName) != 0.0:
+            b_Bought = True
+
+        f_RSI = self.AVData.FetchRSI(str_Key, 0)
+        dict_MACD = self.AVData.FetchMACD(str_Key, 0)
+        # Buy
+        if not b_Bought and (f_RSI <= 35 or dict_MACD[MACDINDEX.Histogram.value] < 0):
+            self.TradeAccount.SetEquityEntryPrice(str_EquityName, float(value))
+            i_TradeCount += 1
+        # Sell
+        elif b_Bought and (f_RSI >= 65 and dict_MACD[MACDINDEX.Histogram.value] > 0):
+            f_EntryPrice = self.TradeAccount.GetEquityEntryPrice(str_EquityName)
+            f_FundStake = self.TradeAccount.GetEquityFundStake(str_EquityName)
+            f_PercentageDiff = float(value) / f_EntryPrice
+            f_FundStake *= f_PercentageDiff
+            self.TradeAccount.SetEquityFundStake(str_EquityName, f_FundStake)
+            self.TradeAccount.SetEquityEntryPrice(str_EquityName, 0.0)
+            i_TradeCount += 1
+        dict_TradeDetails = dict()
+        dict_TradeDetails[TRADEDETAILS.StartingBalance] = i_BeforeBalance
+        dict_TradeDetails[TRADEDETAILS.TradeCount] = i_TradeCount
+        return dict_TradeDetails
+
+    def __TradeWholeDay_RSI_MACD(self, str_EquityName):
         # Print Opening
-        self.__PrintTradeOpening(str_EquityName, TRADESTRATEGY.RSI_MACD)
+        self.__PrintTradeOpening_PastDay(str_EquityName, TRADESTRATEGY.RSI_MACD)
         b_Bought = False
         i_TradeCount = 0
         i_BeforeBalance = self.TradeAccount.GetEquityFundStake(str_EquityName)
@@ -105,7 +165,7 @@ class TradeBot:
             i_DateIndex -= 1
             
         # Print Closing
-        self.__PrintTradeClosing(str_EquityName, i_BeforeBalance, i_TradeCount)
+        self.__PrintTradeClosing_PastDay(str_EquityName, i_BeforeBalance, i_TradeCount)
         dict_TradeDetails = dict()
         dict_TradeDetails[TRADEDETAILS.StartingBalance] = i_BeforeBalance
         dict_TradeDetails[TRADEDETAILS.TradeCount] = i_TradeCount
@@ -124,12 +184,12 @@ class TradeBot:
             return True
         return False
 
-    def __PrintTradeOpening(self, str_EquityName, enum_TradeStrategy):
-        print("*************  Trade Start  ***************")
+    def __PrintTradeOpening_PastDay(self, str_EquityName, enum_TradeStrategy):
+        print("*********  Past Day Trade Start  **********")
         print("Fetching [" + str_EquityName + "] Equity Data")
         print("Now Trading          :   " + str_EquityName + " || " + enum_TradeStrategy.value)
         print("Please Hold...")
-    def __PrintTradeClosing(self, str_EquityName, i_InitialBalance, i_TradeCount):
+    def __PrintTradeClosing_PastDay(self, str_EquityName, i_InitialBalance, i_TradeCount):
         print("**************  Trade End  ****************")
         print("Balance BEFORE trade : " + str(i_InitialBalance))
         print("Balance AFTER trade  : " + str(self.TradeAccount.GetEquityFundStake(str_EquityName)))
@@ -148,8 +208,8 @@ class TradeBot:
     def __PrintAccountDetails(self):
         list_Equities = self.TradeAccount.GetSelectedEquityNames()
         f_AvailableFunds = self.TradeAccount.GetRemainderFunds()
-        print("Total Funds      : " + str(self.TradeAccount.GetTotalFunds()))
         print("Available Funds  : " + str(f_AvailableFunds))
+        print("Total Funds      : " + str(self.TradeAccount.GetTotalFunds()))
         print("Current Equities : ")
         for index in range(len(list_Equities)):
             print("(" + str(index + 1) + ") " + list_Equities[index] + " || " + str(self.TradeAccount.GetEquityFundStake(list_Equities[index])))

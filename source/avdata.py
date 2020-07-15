@@ -26,6 +26,7 @@ class AVData:
         self.str_IntervalTime = "1min"      # 1, 5, 15, 30, 60 are supported
         self.apiData = None
         self.dt_LatestDataTime = None
+        self.str_LatestDataTime = ""
         self.dt_AVTimeLowerBounds = datetime.strptime("9:31:0", '%H:%M:%S')
         self.dt_AVTimeUpperBounds = datetime.strptime("16:0:0", '%H:%M:%S')
         # self.dict_EMA = None
@@ -46,6 +47,7 @@ class AVData:
         # Get latest time from data
         newTime = list(self.apiData.keys())[0] 
         self.dt_LatestDataTime = datetime.strptime(newTime, self.str_DateTimeFormat)
+        self.str_LatestDataTime = newTime
         newTime = newTime.split()
         # print("Latest Time from API: " + str(newTime[0]) + " " + str(newTime[1]))
         # print("=======================================\n")
