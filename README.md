@@ -19,14 +19,16 @@ Install dependencies in the pipefile.
 pipenv install
 ```
 ### Run on Local machine
-Start the Virtual Environment
+Start the Virtual Environment, then Run the python File
 ```
 pipenv shell
-``` 
-Run the python File
-```
 python [Path to python File]
 ```
+Or Run the python File outside the Virtual Environment
+```
+pipenv run python [Path to python File]
+```
+
 
 ## Future possible todos
 - [ ] Menu to use different strategies
