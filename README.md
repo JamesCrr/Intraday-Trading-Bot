@@ -1,7 +1,9 @@
 # Intraday Trading Bot
 A Intraday Trading Bot that tries to use Technical Analysis to earn small profits on the Stock Market.\
-Realtime Stock prices are fetched from [here](https://www.alphavantage.co/).\
-**NOTE:** This is simply a simulation, it is **NOT** using real funds.
+**Real-Time** Stock prices are fetched from [here](https://www.alphavantage.co/).\
+**NOTE:** 
+- This is simply a simulation, it is **NOT** using real funds.
+- It is using **Real** Stock prices for calculations. 
 
 ## Installation
 ### Setup
