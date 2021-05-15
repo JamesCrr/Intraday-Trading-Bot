@@ -258,6 +258,8 @@ class VirtualTrading:
     def __init__(self):
         self.account = dict()
         self.companiesFromAccount = []
+        rootDirPath = os.path.dirname(os.getcwd())
+        print(os.getcwd())
         self.dataDirPath = os.path.join(os.getcwd(), "data")
         self.dataFilePath = os.path.join(os.getcwd(), "data", "accountInfo.json")
         self.AVData = AVData()
@@ -428,6 +430,8 @@ class VirtualTrading:
         self.account[accComStr]["WIX"][accComFundPercentStr] = 100
         self.account[accComStr]["WIX"][accComSharesLeftStr] = 0
         self.account[accComStr]["WIX"][accComSharesPriceStr] = 0
+        for key, value in self.account[accComStr].items():
+            self.companiesFromAccount.append(key)
 
         if os.path.exists(self.dataDirPath) == False:
             os.mkdir(self.dataDirPath)
