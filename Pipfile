@@ -9,6 +9,7 @@ verify_ssl = true
 alpha-vantage = "*"
 pytz = "*"
 pandas = "*"
+python-dotenv = "*"
 
 [requires]
 python_version = "3.7"
