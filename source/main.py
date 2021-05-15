@@ -8,6 +8,9 @@ import json
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.techindicators import TechIndicators
 
+from dotenv import load_dotenv
+load_dotenv()
+
 dateStrFormat = "%Y-%m-%d %H:%M:%S"
 accFundStr = "funds"
 accComStr = "coms"
@@ -24,8 +27,8 @@ class AVDataIndex(enum.Enum):
     Volume = "5. volume"
 class AVData:
     def __init__(self):
-        self.ts = TimeSeries(key='4ZXG1S4Z055LPBAW')
-        self.ti = TechIndicators(key='4ZXG1S4Z055LPBAW')
+        self.ts = TimeSeries(key=os.environ.get("ALPHA_VANTAGE_KEY"))
+        self.ti = TechIndicators(key=os.environ.get("ALPHA_VANTAGE_KEY"))
         self.apiData = dict()
         self.latestData_Time = None
         self.latestData_Price = dir({})

@@ -20,6 +20,11 @@ Install dependencies in the pipefile.
 ```
 pipenv install
 ```
+### Get your key and Create your .env
+Get your own Key from [here](https://www.alphavantage.co/support/#api-key). Create your .env file at root and place your key
+```
+ALPHA_VANTAGE_KEY = YOUR KEY
+```
 ### Run on Local machine
 Start the Virtual Environment, then Run the python File
 ```
